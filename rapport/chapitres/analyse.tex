@@ -1,0 +1,511 @@
+% ─────────────────────────────────────────────────────────────
+\section{Matériel et protocole applicatif}
+
+\subsection{Matériel}
+
+Chaque station est constituée des éléments suivants :
+\begin{itemize}
+    \item une carte \textbf{Arduino Mega 2560} (microcontrôleur ATmega2560) ;
+    \item un \textbf{Shield CAN} construit autour des circuits
+    \texttt{MCP2515} (contrôleur CAN autonome, interface SPI) et
+    \texttt{MCP2551} (émetteur/récepteur CAN) ;
+    \item une \textbf{carte d'E/S HEIG-VD} offrant 8~entrées tout-ou-rien 24~V,
+    8~sorties PNP 12~V, 4~entrées analogiques 0--5~V, 4~sorties analogiques
+    0--5~V ainsi qu'un DIP-switch à 8~interrupteurs et une LED bicolore
+    d'état.
+\end{itemize}
+
+Les cartes sont reliées entre elles par un câble Sub-D~9 pôles transportant
+les signaux \texttt{CANH}, \texttt{CANL} et \texttt{GND}, conformément au
+brochage CANopen. Les résistances de terminaison de \num{120}~$\Omega$
+intégrées au Shield ayant été désactivées, des résistances externes ont été
+placées aux deux extrémités du bus.
+
+\subsection{Format des messages CAN}
+
+Le protocole utilise le format standard \textbf{CAN~2.0A} (identifiant sur
+11~bits). Le champ d'arbitration est structuré comme suit :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|c|}
+\hline
+Bits & Rôle & Valeurs \\
+\hline
+b10 -- b7 & Type de message & 0000 = analogique, 0001 = tout-ou-rien \\
+\hline
+b6 -- b0 & Adresse de la carte (7 bits) & DIP2--DIP7 + inversion du DIP1 \\
+\hline
+\end{tabular}
+\caption{Structure du champ d'arbitration 11 bits}
+\end{table}
+
+Deux types de messages sont définis :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|p{7cm}|}
+\hline
+Type & ID & Contenu des données \\
+\hline
+0000 & \texttt{0x000} + adresse (7 bits) & 4 valeurs analogiques 16 bits
+(8 octets) : AIN0\_LOW, AIN0\_HIGH, \ldots AIN3\_LOW, AIN3\_HIGH \\
+\hline
+0001 & \texttt{0x080} + adresse (7 bits) & 1 octet regroupant les 8~entrées
+tout-ou-rien \\
+\hline
+\end{tabular}
+\caption{Types de messages CAN définis pour l'application}
+\end{table}
+
+Un nouveau message n'est émis que si les valeurs correspondantes ont
+\emph{changé} depuis le dernier envoi, afin de limiter le trafic sur le bus.
+
+\subsection{Configuration par DIP-switch}
+
+Les 8 interrupteurs du DIP-switch ont la fonction suivante :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|p{11cm}|}
+\hline
+\textbf{DIP 1} & Bit de poids faible de l'adresse pour les messages
+\emph{reçus}. Son \emph{inverse} est utilisé pour les messages \emph{émis}.
+Seul ce bit diffère entre deux cartes jumelées. \\
+\hline
+\textbf{DIP 2--7} & 6 bits de poids supérieur de l'adresse (DIP7~=~MSB). \\
+\hline
+\textbf{DIP 8} & Active (1) ou désactive (0) l'émission / la réception des
+messages analogiques. Les messages tout-ou-rien sont toujours traités. \\
+\hline
+\end{tabular}
+\caption{Affectation des 8 interrupteurs DIP}
+\end{table}
+
+\textbf{Exemple :} la carte~1 avec DIP~=~\texttt{0x3A} reçoit les messages
+portant l'adresse \texttt{0x3A} et émet avec l'adresse \texttt{0x3B}. La
+carte~2 (DIP~=~\texttt{0x3B}) fait exactement l'inverse, ce qui assure la
+communication bidirectionnelle.
+
+% ─────────────────────────────────────────────────────────────
+\newpage
+\section{Programmation}
+
+\subsection{Architecture du programme}
+
+Le même programme est chargé dans les deux cartes jumelles ; l'adressage est
+déterminé au démarrage par la lecture du DIP-switch. Le code s'organise en
+deux parties :
+
+\begin{itemize}
+    \item \textbf{\texttt{setup()}} : initialisation des E/S
+    (\texttt{BusTer\_InitInputOutput}), lecture du DIP-switch, calcul des
+    adresses de réception et d'émission, initialisation du MCP2515 à la
+    vitesse choisie, programmation des masques et filtres, puis passage en
+    mode normal.
+    \item \textbf{\texttt{loop()}} : lecture des 8~entrées tout-ou-rien et
+    émission d'un message de type~1 si leur valeur a changé ; si DIP8~=~1,
+    lecture des 4~entrées analogiques et émission d'un message de type~0 si au
+    moins une valeur a changé ; réception éventuelle dans RXB0 (tout-ou-rien)
+    et dans RXB1 (analogiques), avec recopie sur les sorties. En cas d'erreur
+    bus, allumage de la LED rouge et acquittement.
+\end{itemize}
+
+\subsection{Masques et filtres de réception}
+
+L'énoncé impose que les messages tout-ou-rien soient reçus dans \texttt{RXB0}
+et les messages analogiques dans \texttt{RXB1}. Les masques et filtres du
+MCP2515 ont été réglés comme suit :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+Registre & Masque & Filtre(s) \\
+\hline
+RXB0 (digital)    & \texttt{0x7FF} (tous les bits comparés) &
+\texttt{RXF0}=\texttt{RXF1}=\texttt{rxAddress} \\
+\hline
+RXB1 (analogique) & \texttt{0x7FF} & \texttt{RXF2}..\texttt{RXF5}=
+\texttt{0x080 | rxAddress} \\
+\hline
+\end{tabular}
+\caption{Configuration des masques et filtres}
+\end{table}
+
+Comme l'indique la note de l'énoncé, \emph{tous} les registres de filtres ont
+été initialisés, faute de quoi les filtres non programmés accepteraient les
+messages d'ID 0 par défaut.
+
+\subsection{Gestion des LEDs d'état}
+
+La LED bicolore de la carte signale l'état de la communication :
+\begin{itemize}
+    \item \textbf{verte} : contrôleur initialisé, pas d'erreur CAN ;
+    \item \textbf{rouge} : erreur bus signalée par le MCP2515. L'erreur est
+    acquittée automatiquement via \texttt{BusTer\_CanClearError()}.
+\end{itemize}
+
+Le listing complet du programme figure en \textbf{Annexe~A}.
+
+% ─────────────────────────────────────────────────────────────
+\newpage
+\section{Mesures sur bus libre à 1~Mbps}
+
+Les premières mesures sont réalisées avec une seule paire de cartes A1/A2 et
+une vitesse de bus de \num{1}~Mbps.
+
+\subsection{Analyse d'une trame CAN}
+
+Pour cette mesure, le DIP8 est mis à 0 (pas de trafic analogique). L'entrée
+tout-ou-rien n°0 est basculée pour provoquer l'émission d'un unique message.
+La figure~\ref{fig:trame} montre la trame CAN capturée à l'oscilloscope sur la
+ligne \texttt{CANH}. On y distingue les différents champs caractéristiques
+d'une trame CAN 2.0A : \textbf{SOF} (1 bit dominant), \textbf{champ
+d'arbitration} (11 bits d'identifiant + RTR), \textbf{champ de contrôle}
+(IDE, r0, DLC), \textbf{champ de données} (ici 1~octet), \textbf{CRC} (15
+bits + délimiteur), \textbf{ACK} (slot + délimiteur) et enfin \textbf{EOF}
+(7 bits récessifs).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00001.PNG}
+    \caption{Trame CAN complète capturée sur \texttt{CANH} à \num{1}~Mbps
+    (base de temps 10~µs/div).}
+    \label{fig:trame}
+\end{figure}
+
+La figure~\ref{fig:bit} permet de vérifier la durée d'un bit à l'aide des
+curseurs de l'oscilloscope : $\Delta x = 1{,}000$~µs entre deux fronts
+correspondant à un bit, soit une fréquence de bit de
+$f_{\text{bit}} = 1{,}00$~MHz ou \num{1}~Mbps, conforme à la configuration.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00002.PNG}
+    \caption{Mesure de la durée d'un bit : $\Delta x = 1{,}00$~µs
+    $\Rightarrow$ \num{1}~Mbps.}
+    \label{fig:bit}
+\end{figure}
+
+\subsection{Comportement en cas de problème de transmission}
+
+Le câble CAN est débranché, puis l'émission d'un message est provoquée. On
+observe sur la figure~\ref{fig:debranche} une activité \emph{continue} sur la
+ligne du côté émetteur : le MCP2515 n'obtient jamais d'ACK du receveur et
+\emph{retransmet indéfiniment} le même message. La LED rouge s'allume
+brièvement à chaque erreur de transmission.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00003.PNG}
+    \caption{Signal du côté émetteur, câble CAN débranché : retransmission
+    permanente de la trame.}
+    \label{fig:debranche}
+\end{figure}
+
+Ce comportement correspond bien à celui attendu du protocole CAN en mode
+\emph{normal} (non one-shot) : tant que la trame n'a pas été acquittée, le
+contrôleur réessaie, et l'erreur de bus est levée. C'est pour cette raison
+que le MCP2515 propose un mode \emph{one-shot} qui limite à une seule
+tentative pour les protocoles à contrainte temps réel stricte.
+
+\subsection{Latence et gigue à vide}
+\label{sec:latence_vide}
+
+Un signal carré à \num{500}~Hz est injecté sur une entrée tout-ou-rien de la
+carte~A1, et le signal récupéré sur la sortie correspondante de la carte~A2
+est observé simultanément à l'oscilloscope. La latence mesurée est le
+décalage entre le front d'entrée et le front de sortie.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+Grandeur & Valeur mesurée \\
+\hline
+Latence minimale $t_{\min}$ & $416$~µs \\
+\hline
+Latence maximale $t_{\max}$ & $1{,}05$~ms \\
+\hline
+Gigue $J = t_{\max} - t_{\min}$ & $\approx 632$~µs \\
+\hline
+\end{tabular}
+\caption{Latence et gigue à \num{1}~Mbps, bus sans trafic.}
+\label{tab:latence_vide}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00005.PNG}
+    \caption{Latence minimale $t_{\min} = 416$~µs (curseurs de l'oscilloscope).}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00006.PNG}
+    \caption{Latence maximale $t_{\max} = 1{,}05$~ms.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00004.PNG}
+    \caption{Superposition en persistance infinie mettant en évidence la
+    gigue $\Delta t \approx 632$~µs.}
+\end{figure}
+
+\paragraph{Interprétation.}
+La latence $t_{\min}$ correspond au temps nécessaire à la détection du front
+d'entrée, à la construction et à l'envoi du message CAN (8~octets de trame
+$\approx$~100~bits à \num{1}~Mbps, soit $\approx 100$~µs), auquel s'ajoute la
+durée du cycle logiciel \texttt{loop()} et le délai de la sortie analogique
+sur l'autre carte. La gigue, proche de $t_{\min}$, s'explique par le fait que
+la détection du front peut survenir à n'importe quel instant du cycle
+\texttt{loop()} ; elle est donc bornée approximativement par la durée d'un
+tour de boucle.
+
+\subsection{Transmission des valeurs analogiques (trafic spontané)}
+
+Le DIP8 de la carte A1 est mis à 1 pour activer l'émission des messages
+analogiques, tandis que l'entrée analogique est laissée à un potentiel fixe.
+La figure~\ref{fig:trafic} montre pourtant un trafic \emph{continu} sur le
+bus.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00007.PNG}
+    \caption{Trafic observé avec l'entrée analogique laissée fixe.}
+    \label{fig:trafic}
+\end{figure}
+
+\paragraph{Explication.}
+Bien que l'entrée soit branchée sur un potentiel fixe, le bruit électronique
+du CAN de l'Arduino Mega fait varier la valeur lue à chaque itération (LSB
+instable). Comme notre critère d'émission est « envoyer si la valeur a
+changé depuis le dernier message », un message est généré quasiment à chaque
+tour de boucle. Pour limiter ce phénomène il faudrait soit filtrer / arrondir
+la valeur analogique, soit introduire une hystérésis avant de déclencher un
+envoi.
+
+\subsection{Transmission d'un signal sinusoïdal}
+
+Un signal sinusoïdal est injecté sur l'entrée analogique AIN0 de la carte~A1
+et le signal est observé simultanément en entrée (A1) et en sortie analogique
+(AOUT0 de la carte~A2).
+
+\paragraph{Intervalle entre messages.}
+La figure~\ref{fig:intervalle} met en évidence, en zoomant sur les marches
+d'escalier de la sortie, l'intervalle temporel entre deux messages
+analogiques reçus : $\Delta t \approx 1{,}10$~ms.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00008.PNG}
+    \caption{Intervalle entre deux mises à jour successives de la sortie
+    analogique : \num{1{,}10}~ms.}
+    \label{fig:intervalle}
+\end{figure}
+
+\paragraph{Qualité à basse fréquence (6~Hz).}
+Pour $f = 6$~Hz, la sortie analogique reproduit fidèlement l'entrée
+sinusoïdale (figure~\ref{fig:sin6}). L'escalier n'est pas visible à cette
+échelle temporelle, la période étant très grande devant l'intervalle de
+\num{1{,}1}~ms entre messages.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00009.PNG}
+    \caption{Signaux d'entrée (bleu) et de sortie (turquoise) à $f = 6$~Hz.}
+    \label{fig:sin6}
+\end{figure}
+
+\paragraph{Qualité à plus haute fréquence (30~Hz).}
+Pour $f = 30$~Hz (figure~\ref{fig:sin30}), la sortie présente de nettes
+marches d'escalier, un déphasage d'environ un quart de période et une
+amplitude réduite. On se rapproche de la limite de la fréquence de
+Shannon : une période de \num{33}~ms ne contient qu'environ 30~échantillons,
+ce qui dégrade fortement la qualité de reproduction.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00010.PNG}
+    \caption{Signaux d'entrée (bleu) et de sortie (turquoise) à $f = 30$~Hz.
+    La sortie est visiblement dégradée et retardée.}
+    \label{fig:sin30}
+\end{figure}
+
+\paragraph{Influence de la fréquence.}
+La qualité de reproduction est directement liée au nombre d'échantillons
+par période du signal sinusoïdal. L'intervalle entre messages étant fixe
+($\approx$~1,1~ms), la dégradation devient perceptible dès que la période du
+signal se rapproche de cette durée, typiquement au-delà de quelques dizaines
+de hertz.
+
+% ─────────────────────────────────────────────────────────────
+\newpage
+\section{Mesures sur bus chargé à 200~kbps}
+
+Pour cette partie, deux paires de cartes (A1/A2 et B1/B2) partagent le même
+bus CAN, la vitesse est réduite à \num{200}~kbps et les adresses sont fixées
+comme suit :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|c|c|}
+\hline
+Carte & Adresse (DIP1 $\rightarrow$ DIP7) \\
+\hline
+A1 & 22 (0110 100) \\
+A2 & 23 (1110 100) \\
+B1 & 72 (0001 001) \\
+B2 & 73 (1001 001) \\
+\hline
+\end{tabular}
+\caption{Adresses configurées pour les mesures à 4 cartes.}
+\end{table}
+
+\subsection{Latence et gigue sous charge}
+
+Un signal carré à \num{500}~Hz est injecté sur une entrée tout-ou-rien de A1
+et la sortie correspondante est observée sur A2. Dans un premier temps, seul
+le couple A1/A2 est actif, puis le même signal est ajouté sur B1 afin
+d'introduire du trafic supplémentaire.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|c|}
+\hline
+Configuration & $t_{\min}$ & $t_{\max}$ & Gigue $J$ \\
+\hline
+Couple A1/A2 seul (sans trafic) & $604$~µs & $800$~µs & $\approx 192$~µs \\
+\hline
+A1/A2 + trafic sur B1/B2        & $604$~µs & $1{,}07$~ms & $\approx 468$~µs \\
+\hline
+\end{tabular}
+\caption{Latence et gigue à \num{200}~kbps avec et sans trafic concurrent.}
+\label{tab:latence_charge}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00011.PNG}
+    \caption{Latence minimale A1$\rightarrow$A2, bus libre : $604$~µs.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00012.PNG}
+    \caption{Latence maximale A1$\rightarrow$A2, bus libre : $800$~µs.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00013.PNG}
+    \caption{Gigue A1$\rightarrow$A2 bus libre : $\Delta t \approx 192$~µs.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00014.PNG}
+    \caption{Latence minimale A1$\rightarrow$A2 avec trafic B1/B2 : $604$~µs.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00015.PNG}
+    \caption{Latence maximale A1$\rightarrow$A2 avec trafic B1/B2 :
+    $1{,}07$~ms.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00016.PNG}
+    \caption{Gigue A1$\rightarrow$A2 avec trafic B1/B2 :
+    $\Delta t \approx 468$~µs.}
+\end{figure}
+
+\paragraph{Interprétation.}
+\begin{itemize}
+    \item La latence minimale reste \emph{constante} (\num{604}~µs) : quand
+    le bus est libre au moment de l'émission, la durée d'envoi d'un message
+    est indépendante du trafic potentiel.
+    \item En revanche, la latence maximale augmente (\num{800}~µs
+    $\rightarrow$ \num{1{,}07}~ms) car le message d'A1 doit parfois
+    \emph{attendre} la fin d'un message concurrent B1$\rightarrow$B2 avant
+    d'accéder au bus, conformément au mécanisme d'arbitration non destructive
+    du protocole CAN.
+    \item La gigue augmente donc fortement ($\approx 192$~µs
+    $\rightarrow$ $\approx 468$~µs), directement dépendante de la durée
+    d'un message concurrent (\num{\approx 550}~µs à \num{200}~kbps).
+\end{itemize}
+
+\subsection{Transmission d'un signal sinusoïdal sur bus chargé}
+
+Un signal sinusoïdal à \num{50}~Hz est utilisé dans cette partie ; le bus
+étant à \num{200}~kbps, l'intervalle entre messages analogiques est plus grand
+qu'à \num{1}~Mbps, ce qui se traduit par des marches d'escalier déjà bien
+visibles sur la sortie.
+
+\paragraph{Étape 1 — B2 $\rightarrow$ B1 seul.}
+Seul ce flux analogique circule. Le signal est reproduit avec marches
+d'escalier mais sans retard ni instabilité apparente
+(figure~\ref{fig:sin_b2b1}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00020.PNG}
+    \caption{Sinusoïde 50~Hz B2$\rightarrow$B1 seul
+    (base~4~ms/div).}
+    \label{fig:sin_b2b1}
+\end{figure}
+
+\paragraph{Étape 2 — ajout de B1 $\rightarrow$ B2.}
+On active la sinusoïde dans le sens opposé. Le signal précédent devient
+\emph{moins stable} (il « bouge » davantage sur l'écran de l'oscilloscope) :
+chaque message doit désormais partager le bus avec le flux inverse, ce qui
+introduit une gigue supplémentaire dans l'arrivée des échantillons
+(figure~\ref{fig:sin_b1b2}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00021.PNG}
+    \caption{Ajout du flux B1$\rightarrow$B2 : la sortie devient moins
+    stable.}
+    \label{fig:sin_b1b2}
+\end{figure}
+
+\paragraph{Étape 3 — ajout de A2 $\rightarrow$ A1.}
+Un troisième flux analogique est activé entre les cartes A. La sortie
+observée se dégrade encore, avec une amplitude réduite et des marches plus
+grossières (figure~\ref{fig:sin_a2a1}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00022.PNG}
+    \caption{Ajout du flux A2$\rightarrow$A1 : dégradation supplémentaire.}
+    \label{fig:sin_a2a1}
+\end{figure}
+
+\paragraph{Étape 4 — ajout de A1 $\rightarrow$ A2.}
+Avec les quatre flux analogiques actifs simultanément, le bus est saturé :
+la sortie observée est \emph{trop en retard}, ne suit quasiment plus la
+consigne et reste collée à la valeur basse du signal
+(figure~\ref{fig:sin_a1a2}). Les messages de mise à jour arrivent si
+tardivement que la sortie ne « voit » plus les phases hautes de la sinusoïde
+avant que l'échantillon suivant n'ait déjà changé.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{images/TEK00023.PNG}
+    \caption{Les 4 flux actifs : le bus est saturé, la sortie est en retard
+    et ne reproduit plus correctement la sinusoïde.}
+    \label{fig:sin_a1a2}
+\end{figure}
+
+\paragraph{Bilan.}
+Chaque ajout d'un flux analogique (sinusoïde~50~Hz) augmente la charge du
+bus. Tant que la charge reste modérée, l'arbitration CAN absorbe les
+collisions et les signaux restent reproduits. Une fois le bus proche de la
+saturation, l'intervalle entre messages analogiques reçus devient supérieur
+à la période du signal à transmettre, et la qualité de reproduction
+s'effondre.

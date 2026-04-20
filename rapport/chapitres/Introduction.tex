@@ -1,3 +1,25 @@
 \section{Introduction}
 
-Taper votre texte ici ...
+Ce laboratoire a pour objectif la mise en œuvre pratique du bus de terrain CAN
+entre deux cartes Arduino Mega 2560 équipées d'un Shield CAN (MCP2515 +
+MCP2551) et d'une carte d'entrées/sorties HEIG-VD. Le but est d'écrire un
+protocole applicatif permettant de recopier sur chaque carte les entrées
+(tout-ou-rien et analogiques) lues par la carte jumelle.
+
+Le travail se décompose en trois parties :
+\begin{itemize}
+    \item \textbf{Programmation} du contrôleur CAN MCP2515 à l'aide de la
+    bibliothèque \texttt{BusTerUtils} : configuration des masques/filtres de
+    réception, gestion des messages analogiques et tout-ou-rien, lecture des
+    DIP-switches pour l'adressage.
+    \item \textbf{Mesures sur un bus libre} à \num{1}~Mbps : analyse d'une
+    trame, comportement lorsque le câble est débranché, mesure de la latence
+    et de la gigue entre deux cartes, puis transmission d'un signal
+    analogique et sinusoïdal.
+    \item \textbf{Mesures sur un bus chargé} à \num{200}~kbps avec deux paires
+    de cartes partageant le même bus : étude de l'impact du trafic sur la
+    latence, la gigue et la qualité de reproduction d'un signal sinusoïdal.
+\end{itemize}
+
+Les mesures sont effectuées à l'oscilloscope Tektronix et les oscillogrammes
+sont intégrés au rapport.
