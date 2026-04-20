@@ -1,0 +1,187 @@
+# ---------- LaTeX ----------
+## Core auxiliary files
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+.*.lb
+
+## Intermediate documents
+*.dvi
+*.xdv
+*-converted-to.*
+
+## Bibliography
+*.bbl
+*.bcf
+*.blg
+*-blx.aux
+*-blx.bib
+*.run.xml
+
+## Build tool auxiliary files
+*.fdb_latexmk
+*.synctex
+*.synctex(busy)
+*.synctex.gz
+*.synctex.gz(busy)
+*.pdfsync
+
+## Hyperref
+*.brf
+
+## listings
+*.lol
+
+## minted
+_minted*
+*.pyg
+
+## natbib
+*.dpth
+*.md5
+*.dep
+
+## glossaries
+*.acn
+*.acr
+*.glg
+*.glo
+*.gls
+*.glsdefs
+*.lzo
+*.lzs
+*.slg
+*.slo
+*.sls
+
+## algorithms / algorithm2e
+*.alg
+*.loa
+
+## todonotes
+*.tdo
+
+## indexing
+*.idx
+*.ilg
+*.ind
+*.ist
+
+## changes
+*.soc
+
+## nomencl
+*.nlg
+*.nlo
+*.nls
+
+## auto folder (auctex)
+auto/
+*.el
+
+## TikZ externalization
+*.auxlock
+*-tikzDictionary
+*-figure*.dpth
+*-figure*.log
+*-figure*.md5
+
+## pythontex
+*.pytxcode
+pythontex-files-*/
+
+## knitr
+*-concordance.tex
+
+## Beamer
+*.nav
+*.pre
+*.snm
+*.vrb
+
+## Uncomment if you don't want to track the final PDF
+# *.pdf
+
+# ---------- macOS ----------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ---------- Linux ----------
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ---------- Windows ----------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ---------- Editors / IDEs ----------
+## VS Code
+.vscode/
+*.code-workspace
+
+## JetBrains
+.idea/
+*.iml
+
+## Vim
+*.swp
+*.swo
+*.swn
+Session.vim
+.netrwhist
+
+## Emacs
+*~
+\#*\#
+.\#*
+
+## Sublime
+*.sublime-workspace
+*.sublime-project
+
+# ---------- Office / temp ----------
+~$*
+*.tmp
+*.bak
+*.orig
+
+# ---------- Code (général) ----------
+## Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+
+## C/C++
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+build/
+
+## Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
