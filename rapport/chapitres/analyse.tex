@@ -23,8 +23,8 @@ placées aux deux extrémités du bus.
 
 \subsection{Format des messages CAN}
 
-Le protocole utilise le format standard \textbf{CAN~2.0A} (identifiant sur
-11~bits). Le champ d'arbitration est structuré comme suit :
+Le protocole utilise le format standard \textbf{CAN~2.0A}, avec un
+identifiant sur 11~bits. Cet identifiant est découpé en deux parties :
 
 \begin{table}[H]
 \centering
@@ -34,13 +34,13 @@ Bits & Rôle & Valeurs \\
 \hline
 b10 -- b7 & Type de message & 0000 = analogique, 0001 = tout-ou-rien \\
 \hline
-b6 -- b0 & Adresse de la carte (7 bits) & DIP2--DIP7 + inversion du DIP1 \\
+b6 -- b0 & Adresse de la carte (7 bits) & DIP2--DIP7, avec inversion du DIP1 \\
 \hline
 \end{tabular}
-\caption{Structure du champ d'arbitration 11 bits}
+\caption{Découpage de l'identifiant CAN sur 11 bits}
 \end{table}
 
-Deux types de messages sont définis :
+Deux types de trames sont utilisés :
 
 \begin{table}[H]
 \centering
@@ -48,8 +48,8 @@ Deux types de messages sont définis :
 \hline
 Type & ID & Contenu des données \\
 \hline
-0000 & \texttt{0x000} + adresse (7 bits) & 4 valeurs analogiques 16 bits
-(8 octets) : AIN0\_LOW, AIN0\_HIGH, \ldots AIN3\_LOW, AIN3\_HIGH \\
+0000 & \texttt{0x000} + adresse (7 bits) & 4 valeurs analogiques codées sur 16 bits
+(8 octets) : AIN0\_LOW, AIN0\_HIGH, \ldots, AIN3\_LOW, AIN3\_HIGH \\
 \hline
 0001 & \texttt{0x080} + adresse (7 bits) & 1 octet regroupant les 8~entrées
 tout-ou-rien \\
@@ -58,8 +58,8 @@ tout-ou-rien \\
 \caption{Types de messages CAN définis pour l'application}
 \end{table}
 
-Un nouveau message n'est émis que si les valeurs correspondantes ont
-\emph{changé} depuis le dernier envoi, afin de limiter le trafic sur le bus.
+Un message n'est émis que si les valeurs associées ont \emph{changé} depuis
+le dernier envoi, ce qui limite le trafic sur le bus.
 
 \subsection{Configuration par DIP-switch}
 
