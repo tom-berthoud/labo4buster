@@ -1,39 +1,26 @@
 \section{Conclusion}
 
-Ce laboratoire nous a permis de mettre en œuvre concrètement un protocole
-applicatif sur bus CAN en programmant un contrôleur MCP2515 depuis une carte
-Arduino. La configuration des masques et filtres d'acceptation s'est révélée
-essentielle pour que chaque type de message soit routé automatiquement dans
-le bon buffer de réception, sans intervention du processeur dans la boucle
-principale.
+Ce laboratoire nous a permis de programmer un contrôleur CAN MCP2515 et
+d'observer son comportement réel à l'oscilloscope.
 
-Les mesures à l'oscilloscope ont confirmé plusieurs propriétés fondamentales
-du protocole CAN :
-\begin{itemize}
-    \item la durée d'un bit correspond exactement à la vitesse configurée
-    (\num{1}~µs à \num{1}~Mbps) ;
-    \item lorsque la liaison est coupée, l'émetteur retransmet indéfiniment
-    le même message jusqu'à obtention d'un acquittement -- ce qui justifie
-    l'existence du mode \emph{one-shot} pour les applications critiques ;
-    \item la latence minimale de propagation est essentiellement déterminée
-    par la durée d'un cycle logiciel et la durée de transmission d'un
-    message, indépendamment de la charge du bus ;
-    \item la latence maximale et la gigue augmentent en revanche avec le
-    trafic concurrent, à cause de l'arbitration non destructive qui force un
-    message à attendre la fin du message en cours avant d'émettre.
-\end{itemize}
+Plusieurs points sont à retenir. D'abord, le protocole CAN est robuste :
+si personne n'acquitte le message, l'émetteur le retransmet sans cesse
+jusqu'à obtenir une réponse. Ce comportement est utile pour la fiabilité,
+mais peut bloquer le bus en cas de panne.
 
-L'étude du signal sinusoïdal met en évidence l'importance du choix du
-\emph{débit} en fonction du contenu applicatif : l'intervalle de
-\num{1{,}1}~ms entre messages à \num{1}~Mbps permet une reproduction
-satisfaisante jusqu'à plusieurs dizaines de hertz, tandis qu'à
-\num{200}~kbps avec quatre flux concurrents, la sortie analogique devient
-complètement inutilisable à \num{50}~Hz. Le protocole applicatif
-« émission uniquement en cas de changement » s'est par ailleurs révélé
-sensible au bruit du convertisseur analogique, et mériterait l'ajout d'une
-hystérésis ou d'un filtrage dans une application industrielle.
+Ensuite, la latence dépend fortement de la charge. Sur un bus libre,
+chaque message passe rapidement et la gigue reste faible. Dès qu'un autre
+flux est présent, certains messages doivent attendre, et la
+gigue augmente.
 
-Ce laboratoire démontre que le dimensionnement d'une liaison CAN ne se
-résume pas au choix d'une vitesse : le taux de trafic, la longueur des
-messages, leur priorité relative et le protocole applicatif interagissent
-tous pour déterminer la qualité effective de la communication.
+Enfin, l'essai avec un signal sinusoïdal illustre clairement la
+saturation : à \num{200}~kbps, tant qu'un seul flux circule la sortie
+suit correctement l'entrée, mais en ajoutant les flux un par un la qualité
+se dégrade jusqu'à devenir totalement inexploitable avec quatre flux à
+\num{50}~Hz. Le bus est alors saturé : les messages arrivent trop tard
+pour reconstruire le signal.
+
+Le choix du débit n'est donc pas le seul critère lors du dimensionnement
+d'une liaison CAN. Le nombre de nœuds, la fréquence d'émission et le
+type de signal transmis jouent un rôle au moins aussi important pour
+garantir une communication exploitable en pratique.
