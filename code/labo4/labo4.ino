@@ -7,6 +7,10 @@ static uint32_t rxAddress = 0;  // adresse de réception (DIP1-7)
 static uint32_t txAddress = 0;  // adresse d'émission (rxAddress XOR 1)
 static bool analogMode = false; // DIP8 : gestion de l'analogique
 
+// Types de messages définis par l'énoncé: 0000 = analogique, 0001 = digital.
+static const uint32_t CAN_ID_ANALOG  = 0x000;
+static const uint32_t CAN_ID_DIGITAL = 0x080;
+
 // Dernières valeurs envoyées (pour détecter les changements)
 static int    prevAnalog[4]  = {-1, -1, -1, -1};
 static int    prevDigital    = -1;  
@@ -32,19 +36,19 @@ void setup() {
     BusTer_CanInit(BUSTER_CAN_1MBPS);
 
     // --- Masques et filtres ---
-    // RXB0 : messages digitaux (type 0, bits[10:7]=0000)
-    //        ID attendu = rxAddress (bits[6:0])
-    BusTer_CanSetMask(BUSTER_Rxm0, BUSTER_Can2_0A, 0x7FF);
-    BusTer_CanSetFilter(BUSTER_Rxf0, BUSTER_Can2_0A, rxAddress);
-    BusTer_CanSetFilter(BUSTER_Rxf1, BUSTER_Can2_0A, rxAddress);
-
-    // RXB1 : messages analogiques (type 1, bits[10:7]=0001)
+    // RXB0 : messages digitaux (type 1, bits[10:7]=0001)
     //        ID attendu = 0x080 | rxAddress
+    BusTer_CanSetMask(BUSTER_Rxm0, BUSTER_Can2_0A, 0x7FF);
+    BusTer_CanSetFilter(BUSTER_Rxf0, BUSTER_Can2_0A, CAN_ID_DIGITAL | rxAddress);
+    BusTer_CanSetFilter(BUSTER_Rxf1, BUSTER_Can2_0A, CAN_ID_DIGITAL | rxAddress);
+
+    // RXB1 : messages analogiques (type 0, bits[10:7]=0000)
+    //        ID attendu = rxAddress (bits[6:0])
     BusTer_CanSetMask(BUSTER_Rxm1, BUSTER_Can2_0A, 0x7FF);
-    BusTer_CanSetFilter(BUSTER_Rxf2, BUSTER_Can2_0A, 0x080 | rxAddress);
-    BusTer_CanSetFilter(BUSTER_Rxf3, BUSTER_Can2_0A, 0x080 | rxAddress);
-    BusTer_CanSetFilter(BUSTER_Rxf4, BUSTER_Can2_0A, 0x080 | rxAddress);
-    BusTer_CanSetFilter(BUSTER_Rxf5, BUSTER_Can2_0A, 0x080 | rxAddress);
+    BusTer_CanSetFilter(BUSTER_Rxf2, BUSTER_Can2_0A, CAN_ID_ANALOG | rxAddress);
+    BusTer_CanSetFilter(BUSTER_Rxf3, BUSTER_Can2_0A, CAN_ID_ANALOG | rxAddress);
+    BusTer_CanSetFilter(BUSTER_Rxf4, BUSTER_Can2_0A, CAN_ID_ANALOG | rxAddress);
+    BusTer_CanSetFilter(BUSTER_Rxf5, BUSTER_Can2_0A, CAN_ID_ANALOG | rxAddress);
 
     BusTer_CanActivateNormalMode();
 
@@ -70,7 +74,7 @@ void loop() {
 
     // Envoyer uniquement si la valeur a changé
     if ((int)digitalData != prevDigital && BusTer_CanSendReady(BUSTER_Txb0)) {
-        BusTer_CanSend(BUSTER_Txb0, BUSTER_Can2_0A, txAddress, 1, &digitalData);
+        BusTer_CanSend(BUSTER_Txb0, BUSTER_Can2_0A, CAN_ID_DIGITAL | txAddress, 1, &digitalData);
         prevDigital = (int)digitalData;
     }
 
@@ -96,7 +100,7 @@ void loop() {
                 analogBuf[i * 2]     = (INT8U)(val & 0xFF);
                 analogBuf[i * 2 + 1] = (INT8U)((val >> 8) & 0xFF);
             }
-            BusTer_CanSend(BUSTER_Txb1, BUSTER_Can2_0A, 0x080 | txAddress, 8, analogBuf);
+            BusTer_CanSend(BUSTER_Txb1, BUSTER_Can2_0A, CAN_ID_ANALOG | txAddress, 8, analogBuf);
 
             prevAnalog[0] = ain[0];
             prevAnalog[1] = ain[1];

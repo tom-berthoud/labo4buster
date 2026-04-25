@@ -1,26 +1,6 @@
 % ─────────────────────────────────────────────────────────────
 \section{Matériel et protocole applicatif}
 
-\subsection{Matériel}
-
-Chaque station est constituée des éléments suivants :
-\begin{itemize}
-    \item une carte \textbf{Arduino Mega 2560} (microcontrôleur ATmega2560) ;
-    \item un \textbf{Shield CAN} construit autour des circuits
-    \texttt{MCP2515} (contrôleur CAN autonome, interface SPI) et
-    \texttt{MCP2551} (émetteur/récepteur CAN) ;
-    \item une \textbf{carte d'E/S HEIG-VD} offrant 8~entrées tout-ou-rien 24~V,
-    8~sorties PNP 12~V, 4~entrées analogiques 0--5~V, 4~sorties analogiques
-    0--5~V ainsi qu'un DIP-switch à 8~interrupteurs et une LED bicolore
-    d'état.
-\end{itemize}
-
-Les cartes sont reliées entre elles par un câble Sub-D~9 pôles transportant
-les signaux \texttt{CANH}, \texttt{CANL} et \texttt{GND}, conformément au
-brochage CANopen. Les résistances de terminaison de \num{120}~$\Omega$
-intégrées au Shield ayant été désactivées, des résistances externes ont été
-placées aux deux extrémités du bus.
-
 \subsection{Format des messages CAN}
 
 Le protocole utilise le format standard \textbf{CAN~2.0A}, avec un
@@ -104,8 +84,9 @@ deux parties :
     vitesse choisie, programmation des masques et filtres, puis passage en
     mode normal.
     \item \textbf{\texttt{loop()}} : lecture des 8~entrées tout-ou-rien et
-    émission d'un message de type~1 si leur valeur a changé ; si DIP8~=~1,
-    lecture des 4~entrées analogiques et émission d'un message de type~0 si au
+    émission d'un message de type~1 (\texttt{0x080 + adresse}) si leur valeur
+    a changé ; si DIP8~=~1, lecture des 4~entrées analogiques et émission
+    d'un message de type~0 (\texttt{0x000 + adresse}) si au
     moins une valeur a changé ; réception éventuelle dans RXB0 (tout-ou-rien)
     et dans RXB1 (analogiques), avec recopie sur les sorties. En cas d'erreur
     bus, allumage de la LED rouge et acquittement.
@@ -119,15 +100,15 @@ MCP2515 ont été réglés comme suit :
 
 \begin{table}[H]
 \centering
-\begin{tabular}{|l|l|l|}
+\begin{tabular}{|l|p{4cm}|p{6.2cm}|}
 \hline
 Registre & Masque & Filtre(s) \\
 \hline
-RXB0 (digital)    & \texttt{0x7FF} (tous les bits comparés) &
-\texttt{RXF0}=\texttt{RXF1}=\texttt{rxAddress} \\
+RXB0 (digital) & \texttt{0x7FF} (tous les bits comparés) &
+\texttt{RXF0}=\texttt{RXF1}=\texttt{0x080 | rxAddress} \\
 \hline
 RXB1 (analogique) & \texttt{0x7FF} & \texttt{RXF2}..\texttt{RXF5}=
-\texttt{0x080 | rxAddress} \\
+\texttt{rxAddress} \\
 \hline
 \end{tabular}
 \caption{Configuration des masques et filtres}
@@ -154,6 +135,14 @@ Le listing complet du programme figure en \textbf{Annexe~A}.
 
 Les premières mesures sont réalisées avec une seule paire de cartes A1/A2 et
 une vitesse de bus de \num{1}~Mbps.
+
+\paragraph{Remarque importante.}
+Lors des premières mesures, la condition empêchant l'envoi d'un message
+inchangé n'était pas encore implémentée. Le bus était donc occupé en continu
+par des messages tout-ou-rien, ce qui n'a pas empêché les premières
+observations, mais a probablement influencé les mesures de latence et de
+gigue. Faute de temps, ces mesures n'ont pas pu être refaites. Le problème a
+été corrigé avant les mesures sur bus chargé à \num{200}~kbps~\ref{section5}.
 
 \subsection{Analyse d'une trame CAN}
 
@@ -350,7 +339,7 @@ de hertz.
 % ─────────────────────────────────────────────────────────────
 \newpage
 \section{Mesures sur bus chargé à 200~kbps}
-
+\label{section5}
 Pour cette partie, deux paires de cartes (A1/A2 et B1/B2) partagent le même
 bus CAN, la vitesse est réduite à \num{200}~kbps et les adresses sont fixées
 comme suit :
